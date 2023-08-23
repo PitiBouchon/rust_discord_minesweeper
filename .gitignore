@@ -1,3 +1,10 @@
+# Tmp files
+tmp/
+
+# Discord Bot
+token.txt
+application_id.txt
+
 # IntelliJ IDEA
 .idea/
 
