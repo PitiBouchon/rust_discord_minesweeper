@@ -10,7 +10,8 @@ use serenity::prelude::Context;
 use std::path::PathBuf;
 use std::sync::atomic::Ordering;
 use tokio::sync::Mutex;
-use tracing::{debug, instrument};
+use tracing::instrument;
+use tracing::log::debug;
 
 struct MinesweeperSettings {
     width: usize,
@@ -32,20 +33,25 @@ pub async fn start_command(
             attachment.size
         )));
     }
-    if attachment
+    let content_type = attachment
         .content_type
         .as_ref()
-        .is_some_and(|content_type| content_type != "application/wasm")
-    {
-        return Err(Error::msg(format!(
-            "File is not a application/wasm file but {}",
-            attachment.content_type.as_ref().unwrap_or(&"".to_string())
-        )));
-    }
+        .ok_or(Error::msg("Attachment has no content type"))?;
+    let extension = match content_type.as_str() {
+        "application/wasm" => "wasm",
+        "text/x-python" => "py",
+        "text/x-python; charset=utf-8" => "py",
+        _ => {
+            return Err(Error::msg(format!(
+                "Attachment has bad content type: {}",
+                content_type
+            )))
+        }
+    };
     let settings = get_settings(command);
     let file_bytes = attachment.download().await?;
     let game_id = handler.number_grid.fetch_add(1, Ordering::AcqRel); // TODO: Do better
-    let file_path = store_wasm_to_file(file_bytes.as_slice(), game_id).await?;
+    let file_path = store_wasm_to_file(file_bytes.as_slice(), game_id, extension).await?;
     let grid = MinesweeperGrid::new(settings.width, settings.height, settings.bomb_probability);
 
     command
@@ -133,8 +139,12 @@ fn get_settings(command: &ApplicationCommandInteraction) -> MinesweeperSettings 
 }
 
 #[instrument]
-async fn store_wasm_to_file(bytes: &[u8], game_id: usize) -> eyre::Result<PathBuf> {
-    let path = PathBuf::from(format!("./tmp/{}.wasm", game_id));
+async fn store_wasm_to_file(
+    bytes: &[u8],
+    game_id: usize,
+    extension: &str,
+) -> eyre::Result<PathBuf> {
+    let path = PathBuf::from(format!("./tmp/{}.{}", game_id, extension));
     tokio::fs::write(path.as_path(), bytes).await?;
     Ok(path)
 }

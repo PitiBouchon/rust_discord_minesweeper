@@ -14,7 +14,7 @@ use serenity::prelude::{Client, EventHandler, GatewayIntents};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::AtomicUsize;
-use tokio::fs::create_dir_all;
+use tokio::fs::{create_dir_all, remove_dir_all};
 use tokio::sync::{Mutex, RwLock};
 use tracing::instrument;
 
@@ -118,6 +118,7 @@ impl EventHandler for Handler {
 async fn main() {
     tracing_subscriber::fmt::init();
 
+    let _ = remove_dir_all("./tmp/").await;
     create_dir_all("./tmp/").await.unwrap();
 
     let intents = GatewayIntents::empty();
